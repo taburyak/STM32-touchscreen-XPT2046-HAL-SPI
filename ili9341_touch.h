@@ -1,7 +1,7 @@
 /*
  * ili9341_touch.h
  *
- *  Created on: 20 вер. 2019 р.
+ *  Created on: 20 sep. 2019 р.
  *      Author: Andriy Honcharenko
  */
 
@@ -27,11 +27,6 @@ extern SPI_HandleTypeDef ILI9341_TOUCH_SPI_PORT;
 #define ILI9341_TOUCH_SCALE_Y 320
 
 // to calibrate uncomment UART_Printf line in ili9341_touch.c
-//#define ILI9341_TOUCH_MIN_RAW_X 1500
-//#define ILI9341_TOUCH_MAX_RAW_X 31000
-//#define ILI9341_TOUCH_MIN_RAW_Y 3276
-//#define ILI9341_TOUCH_MAX_RAW_Y 30110
-
 #define ILI9341_TOUCH_MIN_RAW_X 3400
 #define ILI9341_TOUCH_MAX_RAW_X 29000
 #define ILI9341_TOUCH_MIN_RAW_Y 3300
@@ -40,6 +35,5 @@ extern SPI_HandleTypeDef ILI9341_TOUCH_SPI_PORT;
 // call before initializing any SPI devices
 bool ILI9341_TouchPressed();
 bool ILI9341_TouchGetCoordinates(uint16_t* x, uint16_t* y);
-
 
 #endif /* ILI9341_TOUCH_H_ */
