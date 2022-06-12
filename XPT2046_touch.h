@@ -12,7 +12,7 @@
 #include <stdbool.h>
 
 /*** Redefine if necessary ***/
-#define	SOFTWARE_SPI
+//#define	SOFTWARE_SPI
 
 #ifdef SOFTWARE_SPI
 
@@ -41,7 +41,7 @@ extern SPI_HandleTypeDef XPT2046_SPI_PORT;
 #define TOUCH_ORIENTATION_PORTRAIT_MIRROR 	(2U)
 #define TOUCH_ORIENTATION_LANDSCAPE_MIRROR 	(3U)
 
-#define ORIENTATION	(TOUCH_ORIENTATION_LANDSCAPE)
+#define ORIENTATION	(TOUCH_ORIENTATION_PORTRAIT_MIRROR)
 
 // change depending on screen orientation
 #if (ORIENTATION == 0)

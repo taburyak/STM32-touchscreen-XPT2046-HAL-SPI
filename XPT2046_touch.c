@@ -154,10 +154,22 @@ bool XPT2046_TouchGetCoordinates(uint16_t* x, uint16_t* y)
     if(raw_y > XPT2046_MAX_RAW_Y) raw_y = XPT2046_MAX_RAW_Y;
 
     // Uncomment this line to calibrate touchscreen:
-    //printf("raw_x = %d, raw_y = %d\r\n", (int) raw_x, (int) raw_y);
+//    printf("raw_x = %6d, raw_y = %6d\r\n", (int) raw_x, (int) raw_y);
+//    printf("\x1b[1F");
 
+#if (ORIENTATION == 0)
+	*x = (raw_x - XPT2046_MIN_RAW_X) * XPT2046_SCALE_X / (XPT2046_MAX_RAW_X - XPT2046_MIN_RAW_X);
+	*y = (raw_y - XPT2046_MIN_RAW_Y) * XPT2046_SCALE_Y / (XPT2046_MAX_RAW_Y - XPT2046_MIN_RAW_Y);
+#elif (ORIENTATION == 1)
+	*x = (raw_x - XPT2046_MIN_RAW_X) * XPT2046_SCALE_X / (XPT2046_MAX_RAW_X - XPT2046_MIN_RAW_X);
+	*y = (raw_y - XPT2046_MIN_RAW_Y) * XPT2046_SCALE_Y / (XPT2046_MAX_RAW_Y - XPT2046_MIN_RAW_Y);
+#elif (ORIENTATION == 2)
     *x = (raw_x - XPT2046_MIN_RAW_X) * XPT2046_SCALE_X / (XPT2046_MAX_RAW_X - XPT2046_MIN_RAW_X);
+    *y = XPT2046_SCALE_Y - (raw_y - XPT2046_MIN_RAW_Y) * XPT2046_SCALE_Y / (XPT2046_MAX_RAW_Y - XPT2046_MIN_RAW_Y);
+#elif (ORIENTATION == 3)
+    *x = XPT2046_SCALE_X - (raw_x - XPT2046_MIN_RAW_X) * XPT2046_SCALE_X / (XPT2046_MAX_RAW_X - XPT2046_MIN_RAW_X);
     *y = (raw_y - XPT2046_MIN_RAW_Y) * XPT2046_SCALE_Y / (XPT2046_MAX_RAW_Y - XPT2046_MIN_RAW_Y);
+#endif
 
     return true;
 }
