@@ -88,14 +88,36 @@ bool XPT2046_TouchPressed(void)
     return HAL_GPIO_ReadPin(XPT2046_IRQ_GPIO_Port, XPT2046_IRQ_Pin) == GPIO_PIN_RESET;
 }
 
-bool XPT2046_TouchGetCoordinates(uint16_t* x, uint16_t* y)
+static uint16_t s_cal_min_x = XPT2046_MIN_RAW_X;
+static uint16_t s_cal_max_x = XPT2046_MAX_RAW_X;
+static uint16_t s_cal_min_y = XPT2046_MIN_RAW_Y;
+static uint16_t s_cal_max_y = XPT2046_MAX_RAW_Y;
+
+void XPT2046_TouchSetCalibration(uint16_t min_x, uint16_t max_x, uint16_t min_y, uint16_t max_y)
+{
+    if (max_x > min_x + 1000U && max_y > min_y + 1000U)
+    {
+        s_cal_min_x = min_x;
+        s_cal_max_x = max_x;
+        s_cal_min_y = min_y;
+        s_cal_max_y = max_y;
+    }
+}
+
+void XPT2046_TouchGetCalibration(uint16_t* min_x, uint16_t* max_x, uint16_t* min_y, uint16_t* max_y)
+{
+    if (min_x) *min_x = s_cal_min_x;
+    if (max_x) *max_x = s_cal_max_x;
+    if (min_y) *min_y = s_cal_min_y;
+    if (max_y) *max_y = s_cal_max_y;
+}
+
+bool XPT2046_TouchGetRawCoordinates(uint16_t* out_raw_x, uint16_t* out_raw_y)
 {
 #ifndef SOFTWARE_SPI
-
-	static const uint8_t cmd_read_x[] = { READ_X };
+    static const uint8_t cmd_read_x[] = { READ_X };
     static const uint8_t cmd_read_y[] = { READ_Y };
     static const uint8_t zeroes_tx[] = { 0x00, 0x00 };
-
 #endif /* SOFTWARE_SPI */
 
     XPT2046_TouchSelect();
@@ -115,25 +137,19 @@ bool XPT2046_TouchGetCoordinates(uint16_t* x, uint16_t* y)
         uint8_t x_raw[2];
 
 #ifdef SOFTWARE_SPI
+        spi_write_byte(READ_Y);
+        y_raw[0] = spi_read_byte();
+        y_raw[1] = spi_read_byte();
 
-       spi_write_byte(READ_Y);
-
-	   y_raw[0] = spi_read_byte();
-	   y_raw[1] = spi_read_byte();
-
-	   spi_write_byte(READ_X);
-
-	   x_raw[0] = spi_read_byte();
-	   x_raw[1] = spi_read_byte();
-
+        spi_write_byte(READ_X);
+        x_raw[0] = spi_read_byte();
+        x_raw[1] = spi_read_byte();
 #else
-
         HAL_SPI_Transmit(&XPT2046_SPI_PORT, (uint8_t*)cmd_read_y, sizeof(cmd_read_y), HAL_MAX_DELAY);
         HAL_SPI_TransmitReceive(&XPT2046_SPI_PORT, (uint8_t*)zeroes_tx, y_raw, sizeof(y_raw), HAL_MAX_DELAY);
 
         HAL_SPI_Transmit(&XPT2046_SPI_PORT, (uint8_t*)cmd_read_x, sizeof(cmd_read_x), HAL_MAX_DELAY);
         HAL_SPI_TransmitReceive(&XPT2046_SPI_PORT, (uint8_t*)zeroes_tx, x_raw, sizeof(x_raw), HAL_MAX_DELAY);
-
 #endif /* SOFTWARE_SPI */
 
         avg_x += (((uint16_t)x_raw[0]) << 8) | ((uint16_t)x_raw[1]);
@@ -145,30 +161,37 @@ bool XPT2046_TouchGetCoordinates(uint16_t* x, uint16_t* y)
     if(nsamples < 16)
         return false;
 
-    uint32_t raw_x = (avg_x / 16);
-    if(raw_x < XPT2046_MIN_RAW_X) raw_x = XPT2046_MIN_RAW_X;
-    if(raw_x > XPT2046_MAX_RAW_X) raw_x = XPT2046_MAX_RAW_X;
+    if (out_raw_x) *out_raw_x = (uint16_t)(avg_x / 16U);
+    if (out_raw_y) *out_raw_y = (uint16_t)(avg_y / 16U);
+    return true;
+}
 
-    uint32_t raw_y = (avg_y / 16);
-    if(raw_y < XPT2046_MIN_RAW_Y) raw_y = XPT2046_MIN_RAW_Y;
-    if(raw_y > XPT2046_MAX_RAW_Y) raw_y = XPT2046_MAX_RAW_Y;
+bool XPT2046_TouchGetCoordinates(uint16_t* x, uint16_t* y)
+{
+    uint16_t raw_x16 = 0U, raw_y16 = 0U;
+    if (!XPT2046_TouchGetRawCoordinates(&raw_x16, &raw_y16))
+        return false;
 
-    // Uncomment this line to calibrate touchscreen:
-//    printf("raw_x = %6d, raw_y = %6d\r\n", (int) raw_x, (int) raw_y);
-//    printf("\x1b[1F");
+    uint32_t raw_x = raw_x16;
+    if(raw_x < s_cal_min_x) raw_x = s_cal_min_x;
+    if(raw_x > s_cal_max_x) raw_x = s_cal_max_x;
+
+    uint32_t raw_y = raw_y16;
+    if(raw_y < s_cal_min_y) raw_y = s_cal_min_y;
+    if(raw_y > s_cal_max_y) raw_y = s_cal_max_y;
 
 #if (ORIENTATION == 0)
-    *x = (raw_x - XPT2046_MIN_RAW_X) * XPT2046_SCALE_X / (XPT2046_MAX_RAW_X - XPT2046_MIN_RAW_X);
-    *y = (raw_y - XPT2046_MIN_RAW_Y) * XPT2046_SCALE_Y / (XPT2046_MAX_RAW_Y - XPT2046_MIN_RAW_Y);
+    *x = (raw_x - s_cal_min_x) * XPT2046_SCALE_X / (s_cal_max_x - s_cal_min_x);
+    *y = (raw_y - s_cal_min_y) * XPT2046_SCALE_Y / (s_cal_max_y - s_cal_min_y);
 #elif (ORIENTATION == 1)
-    *x = (raw_x - XPT2046_MIN_RAW_X) * XPT2046_SCALE_X / (XPT2046_MAX_RAW_X - XPT2046_MIN_RAW_X);
-    *y = XPT2046_SCALE_Y - (raw_y - XPT2046_MIN_RAW_Y) * XPT2046_SCALE_Y / (XPT2046_MAX_RAW_Y - XPT2046_MIN_RAW_Y);
+    *x = (raw_x - s_cal_min_x) * XPT2046_SCALE_X / (s_cal_max_x - s_cal_min_x);
+    *y = XPT2046_SCALE_Y - (raw_y - s_cal_min_y) * XPT2046_SCALE_Y / (s_cal_max_y - s_cal_min_y);
 #elif (ORIENTATION == 2)
-    *x = (raw_x - XPT2046_MIN_RAW_X) * XPT2046_SCALE_X / (XPT2046_MAX_RAW_X - XPT2046_MIN_RAW_X);
-    *y = XPT2046_SCALE_Y - (raw_y - XPT2046_MIN_RAW_Y) * XPT2046_SCALE_Y / (XPT2046_MAX_RAW_Y - XPT2046_MIN_RAW_Y);
+    *x = (raw_x - s_cal_min_x) * XPT2046_SCALE_X / (s_cal_max_x - s_cal_min_x);
+    *y = XPT2046_SCALE_Y - (raw_y - s_cal_min_y) * XPT2046_SCALE_Y / (s_cal_max_y - s_cal_min_y);
 #elif (ORIENTATION == 3)
-    *x = XPT2046_SCALE_X - (raw_x - XPT2046_MIN_RAW_X) * XPT2046_SCALE_X / (XPT2046_MAX_RAW_X - XPT2046_MIN_RAW_X);
-    *y = (raw_y - XPT2046_MIN_RAW_Y) * XPT2046_SCALE_Y / (XPT2046_MAX_RAW_Y - XPT2046_MIN_RAW_Y);
+    *x = XPT2046_SCALE_X - (raw_x - s_cal_min_x) * XPT2046_SCALE_X / (s_cal_max_x - s_cal_min_x);
+    *y = (raw_y - s_cal_min_y) * XPT2046_SCALE_Y / (s_cal_max_y - s_cal_min_y);
 #endif
 
     return true;
